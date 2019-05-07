@@ -1,0 +1,67 @@
+Floppy:
+-------
+GPIn:
+ PB0   WRPROT   28
+ PA1   CHNG      2
+ PA0   INDEX     8
+ PB9   TRK0     26
+ PB4   RDY      34
+GPOut: (Push Pull)
+ PB7   DIR      18
+ PB8   STEP     20
+ PB6   SEL0     10
+ PB5   WGATE    24
+ PB3   SIDE     32
+GPOut, Unbuffered: (Open Drain)
+ PA2   SEL1     12
+ PB1   MOTOR    16
+TimerOut:
+ PA7   WDATA    22 (Timer3/2, UP:DMA1/3)
+TimerIn: (must be 5v tolerant)
+ PA8   RDATA    30 (Timer1/1, CC1:DMA1/2)
+
+Debug Console:
+--------------
+USART1: (Rx:DMA1/5, Tx:DMA1/4)
+ PA9   TX
+ PA10  RX
+
+Buttons:
+--------
+All are OFF=floating, ON=ground. Must be pulled up.
+GPIn:
+ PC8   BT_LEFT
+ PC7   BT_RIGHT
+
+LED Display:
+------------
+Custom I2C-like protocol.
+TimerOut:
+ PB10  DISP_DAT
+ PB11  DISP_CLK
+
+USB:
+----
+Pull the GPIOs high, they are disconnected on USB setup anyway.
+ PA11  USB_DM
+ PA12  USB_DP
+
+Floppy drive 34-pin Shugart interface. For reference:
+-----------------------------------------------------
+  2: <- CHNG
+  4: oo
+  6: oo
+  8: <- INDEX
+ 10: -> SEL0
+ 12: -> SEL1
+ 14: -> SEL2
+ 16: -> MTR
+ 18: -> DIR
+ 20: -> STEP
+ 22: -> DKWD
+ 24: -> DKWE
+ 26: <- TRK0
+ 28: <- WRPROT
+ 30: <- DKRD
+ 32: -> SIDE
+ 34: <- RSY
