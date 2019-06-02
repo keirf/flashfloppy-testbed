@@ -14,7 +14,7 @@ all:
 	$(MAKE) -f $(ROOT)/Rules.mk all
 
 clean:
-	rm -f *.hex *.dfu *.html images
+	rm -rf *.hex *.dfu *.html images
 	$(MAKE) -f $(ROOT)/Rules.mk $@
 
 else
