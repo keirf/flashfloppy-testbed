@@ -131,23 +131,68 @@ static void noinline adf_test(unsigned int nsec)
     printk("Amiga %s - OK\n", (nsec == 11) ? "DD" : "HD");
 }
 
+static void mk_ibm_idams(
+    struct idam *idam, unsigned int nr,
+    unsigned int interleave, unsigned int cskew, unsigned int hskew)
+{
+    unsigned int i, pos;
+    struct idam i0 = *idam;
+
+    memset(idam, 0xff, nr * sizeof(*idam));
+    pos = ((i0.c * cskew) + (i0.h * hskew)) % nr;
+    for (i = 0; i < nr; i++) {
+        while (idam[pos].r != 0xff)
+            pos = (pos + 1) % nr;
+        memcpy(&idam[pos], &i0, sizeof(i0));
+        idam[pos].r = i + i0.r;
+        pos = (pos + interleave) % nr;
+    }
+}
+
+static void check_ibm_idams(
+    const struct idam *expected, unsigned int exp_nr,
+    const struct ibm_scan_info *seen, unsigned int seen_nr)
+{
+    unsigned int i;
+
+    if (exp_nr != seen_nr)
+        goto fail;
+    for (i = 0; i < exp_nr; i++)
+        if (memcmp(&expected[i], &seen[i].idam, sizeof(*expected)))
+            goto fail;
+    return;
+
+fail:
+    printk("Expected %u sectors:\n", exp_nr);
+    for (i = 0; i < exp_nr; i++) {
+        printk(" %u: (%u, %u, %u, %u)\n", i,
+               expected[i].c, expected[i].h,
+               expected[i].r, expected[i].n);
+    }
+    printk("Seen %u sectors:\n", seen_nr);
+    for (i = 0; i < seen_nr; i++) {
+        printk(" %u: (%u, %u, %u, %u)\n", i,
+               seen[i].idam.c, seen[i].idam.h,
+               seen[i].idam.r, seen[i].idam.n);
+    }
+}
+
 static void noinline mfm_rw_sector(struct idam *idam, uint8_t base, uint8_t nr)
 {
     unsigned int sz = 128 << idam->n;
     struct ibm_scan_info info[64];
+    struct idam expected[nr];
     uint8_t *p = alloca(sz), *q = alloca(sz);
     time_t index_timestamp;
-    unsigned int index_period, orig_index_period, gap3;
+    unsigned int index_period, orig_index_period, gap3, seen_nr;
     int i;
 
-    BUG_ON(ibm_mfm_scan(info, ARRAY_SIZE(info), &gap3) != nr);
-    for (i = 0; i < nr; i++) {
-        BUG_ON(info[i].idam.c != idam->c);
-        BUG_ON(info[i].idam.h != idam->h);
-        BUG_ON(info[i].idam.r < base);
-        BUG_ON(info[i].idam.r >= (base+nr));
-        BUG_ON(info[i].idam.n != idam->n);
-    }
+    seen_nr = ibm_mfm_scan(info, ARRAY_SIZE(info), &gap3);
+
+    memcpy(&expected[0], idam, sizeof(*idam));
+    expected[0].r = base;
+    mk_ibm_idams(expected, nr, 1, 0, 0);
+    check_ibm_idams(expected, nr, info, seen_nr);
 
     index_timestamp = index.timestamp;
     while (index_timestamp == index.timestamp)
@@ -177,19 +222,18 @@ static void noinline fm_rw_sector(struct idam *idam, uint8_t base, uint8_t nr)
 {
     unsigned int sz = 128 << idam->n;
     struct ibm_scan_info info[64];
+    struct idam expected[nr];
     uint8_t *p = alloca(sz), *q = alloca(sz);
     time_t index_timestamp;
-    unsigned int index_period, orig_index_period, gap3;
+    unsigned int index_period, orig_index_period, gap3, seen_nr;
     int i;
 
-    BUG_ON(ibm_fm_scan(info, ARRAY_SIZE(info), &gap3) != nr);
-    for (i = 0; i < nr; i++) {
-        BUG_ON(info[i].idam.c != idam->c);
-        BUG_ON(info[i].idam.h != idam->h);
-        BUG_ON(info[i].idam.r < base);
-        BUG_ON(info[i].idam.r >= (base+nr));
-        BUG_ON(info[i].idam.n != idam->n);
-    }
+    seen_nr = ibm_fm_scan(info, ARRAY_SIZE(info), &gap3);
+
+    memcpy(&expected[0], idam, sizeof(*idam));
+    expected[0].r = base;
+    mk_ibm_idams(expected, nr, 1, 0, 0);
+    check_ibm_idams(expected, nr, info, seen_nr);
 
     index_timestamp = index.timestamp;
     while (index_timestamp == index.timestamp)
