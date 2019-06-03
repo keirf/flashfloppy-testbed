@@ -175,6 +175,7 @@ fail:
                seen[i].idam.c, seen[i].idam.h,
                seen[i].idam.r, seen[i].idam.n);
     }
+    BUG_ON(TRUE);
 }
 
 static void noinline mfm_rw_sector(struct idam *idam, uint8_t base, uint8_t nr)
@@ -303,6 +304,8 @@ static void noinline img_test(void)
 
 int main(void)
 {
+    unsigned int i;
+
     /* Relocate DATA. Initialise BSS. */
     if (_sdat != _ldat)
         memcpy(_sdat, _ldat, _edat-_sdat);
@@ -328,7 +331,8 @@ int main(void)
     timer_init(&button_timer, button_timer_fn, NULL);
     timer_set(&button_timer, time_now());
 
-    for (;;) {
+    for (i = 0; ; i++) {
+        printk("\n*** ROUND %u ***\n", i);
         da_test();
         hfe_test();
         dsk_test();
