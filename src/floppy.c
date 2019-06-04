@@ -77,6 +77,34 @@ void floppy_init(void)
         step_one_out();
     set_sel0(O_FALSE);
     drive[0].cyl = 0;
+
+    /* RDATA Timer setup: 
+     * The counter runs from 0x0000-0xFFFF inclusive at full SYSCLK rate.
+     *  
+     * Ch.1 (RDATA) is in Input Capture mode, sampling on every clock and with
+     * no input prescaling or filtering. Samples are captured on the falling 
+     * edge of the input (CCxP=1). DMA is used to copy the sample into a ring
+     * buffer for batch processing in the DMA-completion ISR. */
+    tim_rdata->psc = 0;
+    tim_rdata->arr = 0xffff;
+    tim_rdata->ccmr1 = TIM_CCMR1_CC1S(TIM_CCS_INPUT_TI1);
+    tim_rdata->dier = TIM_DIER_CC1DE;
+    tim_rdata->cr2 = 0;
+
+    /* WDATA Timer setup:
+     * The counter is incremented at full SYSCLK rate. 
+     *  
+     * Ch.2 (WDATA) is in PWM mode 1. It outputs O_TRUE for 400ns and then 
+     * O_FALSE until the counter reloads. By changing the ARR via DMA we alter
+     * the time between (fixed-width) O_TRUE pulses, mimicking floppy drive 
+     * timings. */
+    tim_wdata->psc = 0;
+    tim_wdata->ccmr1 = (TIM_CCMR1_CC2S(TIM_CCS_OUTPUT) |
+                        TIM_CCMR1_OC2M(TIM_OCM_PWM1));
+    tim_wdata->ccer = TIM_CCER_CC2E | ((O_TRUE==0) ? TIM_CCER_CC2P : 0);
+    tim_wdata->ccr2 = sysclk_ns(400);
+    tim_wdata->dier = TIM_DIER_UDE;
+    tim_wdata->cr2 = 0;
 }
 
 void floppy_select(unsigned int unit, unsigned int cyl, unsigned int side)
@@ -274,19 +302,6 @@ void floppy_read_prep(struct read *rd)
     rd->bc_window = ~0;
     rd->bc_prod = 0;
 
-    /* RDATA Timer setup: 
-     * The counter runs from 0x0000-0xFFFF inclusive at full SYSCLK rate.
-     *  
-     * Ch.1 (RDATA) is in Input Capture mode, sampling on every clock and with
-     * no input prescaling or filtering. Samples are captured on the falling 
-     * edge of the input (CCxP=1). DMA is used to copy the sample into a ring
-     * buffer for batch processing in the DMA-completion ISR. */
-    tim_rdata->psc = 0;
-    tim_rdata->arr = 0xffff;
-    tim_rdata->ccmr1 = TIM_CCMR1_CC1S(TIM_CCS_INPUT_TI1);
-    tim_rdata->dier = TIM_DIER_CC1DE;
-    tim_rdata->cr2 = 0;
-
     /* DMA setup: From the RDATA Timer's CCRx into a circular buffer. */
     dma_rdata.cpar = (uint32_t)(unsigned long)&tim_rdata->ccr1;
     dma_rdata.cmar = (uint32_t)(unsigned long)dma.buf;
@@ -403,21 +418,6 @@ void floppy_write_prep(struct write *wr)
 
     wr->ticks_since_flux = 0;
     wr->bc_cons = 0;
-
-    /* WDATA Timer setup:
-     * The counter is incremented at full SYSCLK rate. 
-     *  
-     * Ch.2 (WDATA) is in PWM mode 1. It outputs O_TRUE for 400ns and then 
-     * O_FALSE until the counter reloads. By changing the ARR via DMA we alter
-     * the time between (fixed-width) O_TRUE pulses, mimicking floppy drive 
-     * timings. */
-    tim_wdata->psc = 0;
-    tim_wdata->ccmr1 = (TIM_CCMR1_CC2S(TIM_CCS_OUTPUT) |
-                        TIM_CCMR1_OC2M(TIM_OCM_PWM1));
-    tim_wdata->ccer = TIM_CCER_CC2E | ((O_TRUE==0) ? TIM_CCER_CC2P : 0);
-    tim_wdata->ccr2 = sysclk_ns(400);
-    tim_wdata->dier = TIM_DIER_UDE;
-    tim_wdata->cr2 = 0;
 
     /* DMA setup: From a circular buffer into the WDATA Timer's ARR. */
     dma_wdata.cpar = (uint32_t)(unsigned long)&tim_wdata->arr;
