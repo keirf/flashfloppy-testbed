@@ -423,6 +423,12 @@ void floppy_write_prep(struct write *wr)
     dma_wdata.cpar = (uint32_t)(unsigned long)&tim_wdata->arr;
     dma_wdata.cmar = (uint32_t)(unsigned long)dma.buf;
     dma_wdata.cndtr = ARRAY_SIZE(dma.buf);
+
+    /* Generate initial flux values. */
+    dma.prod = 0;
+    wdata_bc_to_flux(wr);
+
+    /* Enable DMA only after flux values are generated. */
     dma_wdata.ccr = (DMA_CCR_PL_HIGH |
                      DMA_CCR_MSIZE_16BIT |
                      DMA_CCR_PSIZE_16BIT |
@@ -430,10 +436,6 @@ void floppy_write_prep(struct write *wr)
                      DMA_CCR_CIRC |
                      DMA_CCR_DIR_M2P |
                      DMA_CCR_EN);
-
-    /* Generate initial flux values. */
-    dma.prod = 0;
-    wdata_bc_to_flux(wr);
 }
 
 void floppy_write(struct write *wr)
