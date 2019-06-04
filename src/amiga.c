@@ -114,7 +114,7 @@ void amiga_track_read(void *buf, unsigned int track, unsigned int nsec)
 void amiga_track_write(const void *buf, unsigned int track, unsigned int nsec)
 {
     unsigned int track_bytes = (110000 / 32) * 2;
-    uint32_t csum, info, *q, *p, *end;
+    uint32_t csum, info, *q, *p, *end, pr = 0;
     const uint32_t *b;
     unsigned int i, sec;
     struct write wr;
@@ -131,7 +131,8 @@ void amiga_track_write(const void *buf, unsigned int track, unsigned int nsec)
 
 #define emit_raw(r) ({                          \
     uint32_t _r = (r);                          \
-    *q = htobe32(_r & ~(q[-1] << 31));          \
+    *q = htobe32(_r & ~(pr << 31));             \
+    pr = _r;                                    \
     q++; })
 #define emit_long(l) ({                         \
     uint32_t _l = (l), __l = _l;                \
