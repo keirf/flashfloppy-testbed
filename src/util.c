@@ -16,6 +16,11 @@ void __bug(const char *p, const char *file, unsigned int line)
     for (;;);
 }
 
+void __warn(const char *p, const char *file, unsigned int line)
+{
+    printk("WARN at %s:%u: \"%s\"\n", file, line, p);
+}
+
 void *memset(void *s, int c, size_t n)
 {
     char *p = s;

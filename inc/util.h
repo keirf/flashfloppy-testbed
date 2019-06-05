@@ -15,6 +15,9 @@
 void __attribute__((noreturn)) __bug(const char *p, const char *file,
                                      unsigned int line);
 
+#define WARN_ON(p) do { if ((p)) __warn(#p, __FILE__, __LINE__); } while (0)
+void __warn(const char *p, const char *file, unsigned int line);
+
 typedef char bool_t;
 #define TRUE 1
 #define FALSE 0
