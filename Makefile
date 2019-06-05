@@ -45,7 +45,7 @@ write: images
 	sudo umount /mnt
 
 BAUD=115200
-DEV=/dev/ttyUSB0
+DEV=/dev/ttyUSB1
 
 flash: all
 	sudo stm32flash -b $(BAUD) -w FF.hex $(DEV)
