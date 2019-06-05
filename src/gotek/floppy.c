@@ -75,11 +75,10 @@ static void board_floppy_init(void)
     gpio_configure_pin(gpioa, 2, GPO_opendrain(_2MHz,O_FALSE));
     gpio_configure_pin(gpiob, 1, GPO_opendrain(_2MHz,O_FALSE));
 
-    /* PB[15:2] -> EXT[15:2], PA[1:0] -> EXT[1:0] */
-    afio->exticr2 = afio->exticr3 = afio->exticr4 = 0x1111;
-    afio->exticr1 = 0x1100;
+    /* PA[15:0] -> EXT[15:0] */
+    afio->exticr1 = afio->exticr2 = afio->exticr3 = afio->exticr4 = 0x0000;
 
-    exti->imr = exti->ftsr = m(pin_dskchg) | m(pin_index);
+    exti->imr = exti->ftsr = m(pin_rdata) | m(pin_dskchg) | m(pin_index);
 }
 
 /*

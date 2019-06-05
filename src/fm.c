@@ -44,7 +44,7 @@ void fm_check(const void *p, unsigned int nr)
             for (j = i+1; j < min_t(int, i+3, nr); j++)
                 printk("%04x ", be16toh(in[j]));
             printk("\n");
-            BUG_ON(TRUE);
+            WARN_ON(TRUE);
         }
     }
 }

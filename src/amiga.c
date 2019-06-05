@@ -58,7 +58,7 @@ void amiga_track_read(void *buf, unsigned int track, unsigned int nsec)
      * in one go (no track gap). */
     index.count = 0;
     do {
-        BUG_ON(index.count >= 2);
+        WARN_ON(index.count >= 2);
         floppy_read_prep(&rd);
         floppy_read(&rd);
         info = get_long(p+1);
@@ -70,7 +70,7 @@ void amiga_track_read(void *buf, unsigned int track, unsigned int nsec)
 
     /* Check MFM validity. */
     for (i = 0; i < nsec; i++) {
-        BUG_ON(p[i*272] != htobe32(0x44894489));
+        WARN_ON(p[i*272] != htobe32(0x44894489));
         p[i*272] = htobe32(0x44a944a9);
     }
     mfm_check(p, track_bytes);
@@ -83,18 +83,18 @@ void amiga_track_read(void *buf, unsigned int track, unsigned int nsec)
         trk = info >> 16;
         sec = info >> 8;
         togo = info;
-        BUG_ON(format != 0xff);
-        BUG_ON(trk != track);
-        BUG_ON(sec >= nsec);
-        BUG_ON(togo != (nsec-i));
+        WARN_ON(format != 0xff);
+        WARN_ON(trk != track);
+        WARN_ON(sec >= nsec);
+        WARN_ON(togo != (nsec-i));
 
         /* Header checksum. */
         csum = amigados_mfm_checksum(p+1, 10);
-        BUG_ON(csum != get_long(p+11));
+        WARN_ON(csum != get_long(p+11));
 
         /* Data checksum. */
         csum = amigados_mfm_checksum(p+15, 256);
-        BUG_ON(csum != get_long(p+13));
+        WARN_ON(csum != get_long(p+13));
 
         /* Decode the data. */
         p += 15;
@@ -121,7 +121,7 @@ void amiga_track_write(const void *buf, unsigned int track, unsigned int nsec)
 
     if (nsec != 11) {
         /* Amiga HD track */
-        ASSERT(nsec = 22);
+        ASSERT(nsec == 22);
         track_bytes *= 2;
     }
 

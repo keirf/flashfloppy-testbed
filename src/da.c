@@ -26,7 +26,7 @@ static void da_check_status(void *p)
 {
     struct da_status_sector *dass = (struct da_status_sector *)p;
     ibm_mfm_read_sector(p, &idam);
-    BUG_ON(strcmp(dass->sig, sig));
+    WARN_ON(strcmp(dass->sig, sig));
 }
 
 void da_select_image(const char *name)
@@ -57,13 +57,13 @@ void da_test(void)
     floppy_select(0, DA_SD_FM_CYL, 0);
     cur_drive->ticks_per_cell = sysclk_us(4);
     ibm_fm_read_sector(p, &fm_idam);
-    BUG_ON(strcmp(dass->sig, sig));
+    WARN_ON(strcmp(dass->sig, sig));
 
     /* Check the MFM interface. */
     floppy_select(0, DA_DD_MFM_CYL, 0);
     cur_drive->ticks_per_cell = sysclk_us(2);
     ibm_mfm_read_sector(p, &idam);
-    BUG_ON(strcmp(dass->sig, sig));
+    WARN_ON(strcmp(dass->sig, sig));
 }
 
 /*

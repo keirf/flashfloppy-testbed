@@ -126,7 +126,7 @@ static void noinline adf_test(unsigned int nsec)
     amiga_track_write(p, track, nsec);
 
     amiga_track_read(q, track, nsec);
-    BUG_ON(memcmp(p, q, nsec*512));
+    WARN_ON(memcmp(p, q, nsec*512));
 
     printk("Amiga %s - OK\n", (nsec == 11) ? "DD" : "HD");
 }
@@ -175,7 +175,7 @@ fail:
                seen[i].idam.c, seen[i].idam.h,
                seen[i].idam.r, seen[i].idam.n);
     }
-    BUG_ON(TRUE);
+    WARN_ON(TRUE);
 }
 
 static void noinline mfm_rw_sector(struct idam *idam, uint8_t base, uint8_t nr)
@@ -215,7 +215,7 @@ static void noinline mfm_rw_sector(struct idam *idam, uint8_t base, uint8_t nr)
            (int)(index_period - orig_index_period) / (int)time_ms(1));
 
     ibm_mfm_read_sector(q, idam);
-    BUG_ON(memcmp(p, q, sz));
+    WARN_ON(memcmp(p, q, sz));
     printk("MFM %u r/w sector - OK\n", sz);
 }
 
@@ -256,7 +256,7 @@ static void noinline fm_rw_sector(struct idam *idam, uint8_t base, uint8_t nr)
            (int)(index_period - orig_index_period) / (int)time_ms(1));
 
     ibm_fm_read_sector(q, idam);
-    BUG_ON(memcmp(p, q, sz));
+    WARN_ON(memcmp(p, q, sz));
     printk("FM %u r/w sector - OK\n", sz);
 }
 

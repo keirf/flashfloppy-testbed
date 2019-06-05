@@ -58,7 +58,7 @@ unsigned int ibm_mfm_scan(
         int gap3 = sec_bytes
             - (mfm_gap_sync + 8 + 2 + mfm_gap2)
             - (mfm_gap_sync + 4 + (128<<info[0].idam.n) + 2);
-        BUG_ON(gap3 < 0);
+        WARN_ON(gap3 < 0);
         *p_gap3 = (unsigned int)gap3;
     } else if (p_gap3) {
         *p_gap3 = 84; /* make one up */
@@ -78,7 +78,7 @@ void ibm_mfm_search(struct read *rd, const struct idam *idam)
     index.count = 0;
 
     do {
-        BUG_ON(index.count >= 2);
+        WARN_ON(index.count >= 2);
         floppy_read_prep(rd);
         floppy_read(rd);
         mfm_to_bin(p, 10);
@@ -103,9 +103,9 @@ void ibm_mfm_read_sector(void *buf, const struct idam *idam)
     floppy_read(&rd);
     mfm_check(p+6, dam_bytes-3);
     mfm_to_bin(p, dam_bytes);
-    BUG_ON(memcmp(p, mfm_idam_mark, 3));
-    BUG_ON(p[3] != 0xfb);
-    BUG_ON(crc16_ccitt(p, dam_bytes, 0xffff));
+    WARN_ON(memcmp(p, mfm_idam_mark, 3));
+    WARN_ON(p[3] != 0xfb);
+    WARN_ON(crc16_ccitt(p, dam_bytes, 0xffff));
 
     memcpy(buf, p+4, 128<<idam->n);
 }
@@ -218,7 +218,7 @@ unsigned int ibm_fm_scan(
         int gap3 = sec_bytes
             - (fm_gap_sync + 5 + 2 + fm_gap2)
             - (fm_gap_sync + 1 + (128<<info[0].idam.n) + 2);
-        BUG_ON(gap3 < 0);
+        WARN_ON(gap3 < 0);
         *p_gap3 = (unsigned int)gap3;
     }
 
@@ -236,7 +236,7 @@ void ibm_fm_search(struct read *rd, const struct idam *idam)
     index.count = 0;
 
     do {
-        BUG_ON(index.count >= 2);
+        WARN_ON(index.count >= 2);
         floppy_read_prep(rd);
         floppy_read(rd);
         fm_to_bin(p, 8);
@@ -261,8 +261,8 @@ void ibm_fm_read_sector(void *buf, const struct idam *idam)
     floppy_read(&rd);
     fm_check(p+4, dam_bytes-2);
     fm_to_bin(p, dam_bytes);
-    BUG_ON(p[1] != 0xfb);
-    BUG_ON(crc16_ccitt(p+1, dam_bytes-1, 0xffff));
+    WARN_ON(p[1] != 0xfb);
+    WARN_ON(crc16_ccitt(p+1, dam_bytes-1, 0xffff));
 
     memcpy(buf, p+2, 128<<idam->n);
 }

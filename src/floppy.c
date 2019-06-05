@@ -91,6 +91,10 @@ void floppy_init(void)
     tim_rdata->dier = TIM_DIER_CC1DE;
     tim_rdata->cr2 = 0;
 
+    /* RDATA DMA setup: From the RDATA Timer's CCRx into a circular buffer. */
+    dma_rdata.cpar = (uint32_t)(unsigned long)&tim_rdata->ccr1;
+    dma_rdata.cmar = (uint32_t)(unsigned long)dma.buf;
+
     /* WDATA Timer setup:
      * The counter is incremented at full SYSCLK rate. 
      *  
@@ -105,6 +109,10 @@ void floppy_init(void)
     tim_wdata->ccr2 = sysclk_ns(400);
     tim_wdata->dier = TIM_DIER_UDE;
     tim_wdata->cr2 = 0;
+
+    /* WDATA DMA setup: From a circular buffer into the WDATA Timer's ARR. */
+    dma_wdata.cpar = (uint32_t)(unsigned long)&tim_wdata->arr;
+    dma_wdata.cmar = (uint32_t)(unsigned long)dma.buf;
 }
 
 void floppy_select(unsigned int unit, unsigned int cyl, unsigned int side)
@@ -160,7 +168,7 @@ void floppy_select(unsigned int unit, unsigned int cyl, unsigned int side)
     /* Wait for motor spin up. */
     t = time_now();
     while (get_ready() == O_FALSE)
-        BUG_ON(time_diff(t, time_now()) > time_ms(1000));
+        WARN_ON(time_diff(t, time_now()) > time_ms(1000));
 }
 
 void test_ready(void)
@@ -209,6 +217,11 @@ static bool_t rdata_wait_sync(struct read *rd)
             break;
         next = dma.buf[cons];
         curr = next - prev;
+        if (curr > (6*cell)) {
+            printk("Long flux @ dma=%u bc=%u: %u-%u=%u / %u\n",
+                   cons, bc_prod, next, prev, curr, cell);
+            WARN_ON(TRUE);
+        }
         prev = next;
         while (curr > window) {
             curr -= cell;
@@ -266,6 +279,11 @@ static bool_t rdata_flux_to_bc(struct read *rd)
     for (cons = dma.cons; cons != prod; cons = (cons+1) & buf_mask) {
         next = dma.buf[cons];
         curr = next - prev;
+        if (curr > (6*cell)) {
+            printk("Long flux @ dma=%u bc=%u: %u-%u=%u / %u\n",
+                   cons, bc_prod, next, prev, curr, cell);
+            WARN_ON(TRUE);
+        }
         prev = next;
         while (curr > window) {
             curr -= cell;
@@ -302,9 +320,7 @@ void floppy_read_prep(struct read *rd)
     rd->bc_window = ~0;
     rd->bc_prod = 0;
 
-    /* DMA setup: From the RDATA Timer's CCRx into a circular buffer. */
-    dma_rdata.cpar = (uint32_t)(unsigned long)&tim_rdata->ccr1;
-    dma_rdata.cmar = (uint32_t)(unsigned long)dma.buf;
+    /* Start DMA. */
     dma_rdata.cndtr = ARRAY_SIZE(dma.buf);
     dma_rdata.ccr = (DMA_CCR_PL_HIGH |
                      DMA_CCR_MSIZE_16BIT |
@@ -316,15 +332,18 @@ void floppy_read_prep(struct read *rd)
 
     /* DMA soft state. */
     dma.cons = 0;
-    dma.prev_sample = 0;
+    dma.prev_sample = tim_rdata->cnt;
 }
 
 void floppy_read(struct read *rd)
 {
+    /* Wait for RDATA active. */
+    exti->pr = m(pin_rdata);
+    while (!(exti->pr & m(pin_rdata)))
+        continue;
+
     /* Start timer. */
     tim_rdata->ccer = TIM_CCER_CC1E | TIM_CCER_CC1P;
-    tim_rdata->egr = TIM_EGR_UG;
-    tim_rdata->sr = 0; /* dummy write, gives h/w time to process EGR.UG=1 */
     tim_rdata->cr1 = TIM_CR1_CEN;
 
     rd->start = time_now();
@@ -419,13 +438,11 @@ void floppy_write_prep(struct write *wr)
     wr->ticks_since_flux = 0;
     wr->bc_cons = 0;
 
-    /* DMA setup: From a circular buffer into the WDATA Timer's ARR. */
-    dma_wdata.cpar = (uint32_t)(unsigned long)&tim_wdata->arr;
-    dma_wdata.cmar = (uint32_t)(unsigned long)dma.buf;
+    /* Initialise DMA ring indexes (consumer index is implicit). */
     dma_wdata.cndtr = ARRAY_SIZE(dma.buf);
+    dma.prod = 0;
 
     /* Generate initial flux values. */
-    dma.prod = 0;
     wdata_bc_to_flux(wr);
 
     /* Enable DMA only after flux values are generated. */
