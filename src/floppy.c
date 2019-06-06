@@ -361,6 +361,7 @@ void floppy_read(struct read *rd)
     /* Turn off timer. */
     tim_rdata->ccer = 0;
     tim_rdata->cr1 = 0;
+    tim_rdata->sr = 0; /* dummy, drains any pending DMA */
 
     /* Turn off DMA. */
     dma_rdata.ccr = 0;
@@ -497,6 +498,7 @@ out:
 
     /* Turn off timer. */
     tim_wdata->cr1 = 0;
+    tim_wdata->sr = 0; /* dummy, drains any pending DMA */
 
     /* Turn off DMA. */
     dma_wdata.ccr = 0;
