@@ -168,7 +168,7 @@ void floppy_select(unsigned int unit, unsigned int cyl, unsigned int side)
     /* Wait for motor spin up. */
     t = time_now();
     while (get_ready() == O_FALSE)
-        WARN_ON(time_diff(t, time_now()) > time_ms(1000));
+        BUG_ON(time_diff(t, time_now()) > time_ms(1000));
 }
 
 void test_ready(void)
