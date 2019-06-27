@@ -115,10 +115,9 @@ void floppy_init(void)
     dma_wdata.cmar = (uint32_t)(unsigned long)dma.buf;
 }
 
-void floppy_select(unsigned int unit, unsigned int cyl, unsigned int side)
+void floppy_select(unsigned int unit)
 {
     struct drive *drv = &drive[unit];
-    time_t t;
 
     /* Remember which unit is now selected. */
     ASSERT(unit <= 1);
@@ -134,18 +133,17 @@ void floppy_select(unsigned int unit, unsigned int cyl, unsigned int side)
         set_sel0(O_TRUE);
     }
 
-    /* Wait for inputs to settle, and select requested disk side. */
+    /* Wait for inputs to settle. */
     delay_us(10);
-    set_side(side ? O_TRUE : O_FALSE);
-
-    /* Wait for image to be mounted. We step heads and poll DSKCHG. */
-    if (get_dskchg() == O_TRUE) {
-        step_one_out();
-        if (drv->cyl)
-            drv->cyl--;
-    }
-
     set_motor(O_TRUE);
+}
+
+void floppy_seek(unsigned int cyl, unsigned int side)
+{
+    struct drive *drv = cur_drive;
+
+    /* Select requested disk side. */
+    set_side(side ? O_TRUE : O_FALSE);
 
     /* Special handling for cylinder 0. */
     if (cyl == 0) {
@@ -164,11 +162,46 @@ void floppy_select(unsigned int unit, unsigned int cyl, unsigned int side)
         drv->cyl--;
     }
     delay_ms(10);
+}
+
+void floppy_disk_change(void)
+{
+    struct drive *drv = cur_drive;
+    time_t t[4];
+
+    /* Reset DSKCHG counter. */
+    dskchg.count = 0;
+
+    /* Seek from D-A back to cylinder 0. This triggers the disk change. */
+    BUG_ON(get_trk0() == O_TRUE);
+    floppy_seek(0, 0);
+
+    /* Wait for DSKCHG to toggle. */
+    t[0] = time_now();
+    while (dskchg.count == 0)
+        BUG_ON(time_diff(t[0], time_now()) > time_ms(1000));
+
+    /* Wait for image to be mounted. We step heads and poll DSKCHG. */ 
+    t[1] = time_now();
+    while (get_dskchg() == O_TRUE) {
+        BUG_ON(time_diff(t[1], time_now()) > time_ms(5000));
+        step_one_out();
+        if (drv->cyl)
+            drv->cyl--;
+    }
 
     /* Wait for motor spin up. */
-    t = time_now();
+    set_motor(O_TRUE);
+    t[2] = time_now();
     while (get_ready() == O_FALSE)
-        BUG_ON(time_diff(t, time_now()) > time_ms(1000));
+        BUG_ON(time_diff(t[2], time_now()) > time_ms(1000));
+    t[3] = time_now();
+
+    if (time_diff(t[0],t[3]) > time_ms(1000))
+        printk("WARN: Long Disk Change: Eject=%ums Insert=%ums Ready=%ums\n",
+               time_diff(t[0],t[1]) / time_ms(1),
+               time_diff(t[1],t[2]) / time_ms(1),
+               time_diff(t[2],t[3]) / time_ms(1));
 }
 
 void test_ready(void)

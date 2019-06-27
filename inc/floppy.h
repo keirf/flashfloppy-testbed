@@ -136,8 +136,9 @@ void fm_check(const void *p, unsigned int nr);
 
 /* External API. */
 void floppy_init(void);
-/* Select requested drive unit and seek to requested track. */
-void floppy_select(unsigned int unit, unsigned int cyl, unsigned int side);
+void floppy_select(unsigned int unit);
+void floppy_seek(unsigned int cyl, unsigned int side);
+void floppy_disk_change(void);
 void test_ready(void);
 
 /*

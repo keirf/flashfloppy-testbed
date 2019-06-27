@@ -34,7 +34,7 @@ void da_select_image(const char *name)
     uint8_t *p = alloca(512);
     struct da_cmd_sector *dacs = (struct da_cmd_sector *)p;
 
-    floppy_select(0, DA_DD_MFM_CYL, 0);
+    floppy_seek(DA_DD_MFM_CYL, 0);
     cur_drive->ticks_per_cell = sysclk_us(2);
     da_check_status(p);
 
@@ -44,7 +44,7 @@ void da_select_image(const char *name)
     ibm_mfm_write_sector(p, &idam, 4);
 
     da_check_status(p);
-    floppy_select(0, 0, 0);
+    floppy_disk_change();
 }
 
 void da_test(void)
@@ -53,14 +53,16 @@ void da_test(void)
     struct da_status_sector *dass = (struct da_status_sector *)p;
     const static struct idam fm_idam = { 254, 0, 0, 2 };
 
+    floppy_select(0);
+
     /* Check the FM interface. */
-    floppy_select(0, DA_SD_FM_CYL, 0);
+    floppy_seek(DA_SD_FM_CYL, 0);
     cur_drive->ticks_per_cell = sysclk_us(4);
     ibm_fm_read_sector(p, &fm_idam);
     WARN_ON(strcmp(dass->sig, sig));
 
     /* Check the MFM interface. */
-    floppy_select(0, DA_DD_MFM_CYL, 0);
+    floppy_seek(DA_DD_MFM_CYL, 0);
     cur_drive->ticks_per_cell = sysclk_us(2);
     ibm_mfm_read_sector(p, &idam);
     WARN_ON(strcmp(dass->sig, sig));

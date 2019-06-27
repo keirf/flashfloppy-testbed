@@ -62,9 +62,10 @@ static void noinline hfe_test(void)
     int i;
 
     printk("\nHFE TEST:\n");
+    floppy_select(0);
 
     da_select_image("hd.hfe");
-    floppy_select(0, 5, 1);
+    floppy_seek(5, 1);
     cur_drive->ticks_per_cell = sysclk_us(1);
 
     test_ready();
@@ -115,10 +116,11 @@ static void noinline adf_test(unsigned int nsec)
     char name[16];
 
     printk("\nADF TEST:\n");
+    floppy_select(0);
 
     snprintf(name, sizeof(name), "amiga_%u", nsec*80);
     da_select_image(name);
-    floppy_select(0, track/2, track&1);
+    floppy_seek(track/2, track&1);
     cur_drive->ticks_per_cell = sysclk_us(2);
 
     for (i = 0; i < nsec*512; i++)
@@ -266,11 +268,13 @@ static void noinline dsk_test(void)
     struct idam idam_512 = { 0, 0, 18, 2 };
 
     printk("\nDSK TEST:\n");
+    floppy_select(0);
+
     da_select_image("tst_dsk");
-    floppy_select(0, 2, 0);
+    floppy_seek(2, 0);
     cur_drive->ticks_per_cell = sysclk_us(2);
     mfm_rw_sector(&idam_8k, 3, 1);
-    floppy_select(0, 0, 0);
+    floppy_seek(0, 0);
     cur_drive->ticks_per_cell = sysclk_us(2);
     mfm_rw_sector(&idam_512, 3, 16);
     idam_512.r = 3;
@@ -282,21 +286,22 @@ static void noinline img_test(void)
     struct idam idam = { 0, 0, 1, 2 };
 
     printk("\nIMG TEST:\n");
+    floppy_select(0);
 
     da_select_image("720k");
-    floppy_select(0, 0, 0);
+    floppy_seek(0, 0);
     idam.n = 2;
     cur_drive->ticks_per_cell = sysclk_us(2);
     mfm_rw_sector(&idam, 1, 9);
 
     da_select_image("200k");
-    floppy_select(0, 0, 0);
+    floppy_seek(0, 0);
     idam.n = 1;
     cur_drive->ticks_per_cell = sysclk_us(4);
     fm_rw_sector(&idam, 0, 10);
 
     da_select_image("8k.8k");
-    floppy_select(0, 0, 0);
+    floppy_seek(0, 0);
     idam.n = 6;
     cur_drive->ticks_per_cell = sysclk_us(1);
     mfm_rw_sector(&idam, 1, 1);
