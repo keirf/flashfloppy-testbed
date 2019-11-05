@@ -46,11 +46,13 @@ static bool_t rdata_wait_sync(struct read *rd)
             break;
         next = dma.buf[cons];
         curr = next - prev;
+#ifndef QUICKDISK /* This happens in ibm_mfm_{scan,search} for example. */
         if (curr > (6*cell)) {
             printk("Long flux @ dma=%u bc=%u: %u-%u=%u / %u\n",
                    cons, bc_prod, next, prev, curr, cell);
             WARN_ON(TRUE);
         }
+#endif
         prev = next;
         while (curr > window) {
             curr -= cell;
