@@ -178,6 +178,105 @@ void ibm_mfm_write_sector(
     floppy_write(&wr);
 }
 
+void ibm_mfm_write_track(
+    const struct idam *idam, unsigned int nr, unsigned int gap3)
+{
+    unsigned int idam_bytes, dam_bytes, track_bytes;
+    unsigned int sync_off[nr*2];
+    uint8_t *q, *p, *s;
+    uint16_t crc, *sync;
+    struct write wr;
+    int i;
+
+    idam_bytes = mfm_gap_sync + 8 + 2 + mfm_gap2;
+    dam_bytes = mfm_gap_sync + 4 + 2 + gap3;
+
+    /* XXX TODO: Write IAM. Construct suitable pre-index gap. */
+
+    /* Calculate write length: must be an even number of bytes. */
+    track_bytes = 64;
+    for (i = 0; i < nr; i++) {
+        track_bytes += idam_bytes;
+        track_bytes += dam_bytes;
+        track_bytes += 128 << idam[i].n;
+    }
+    track_bytes += 64;
+    if (track_bytes & 1) {
+        /* We write multiples of 32 bitcells: pad the write with extra GAP
+         * to achieve this. */
+        track_bytes++;
+    }
+
+    wr.p = p = bc_buf_alloc(track_bytes);
+    wr.nr_words = track_bytes;
+    wr.terminate_at_index = TRUE;
+
+    /* Generate the sector data. */
+    q = p;
+    /* Post-index gap */
+    memset(q, 0x4e, 64);
+    q += 64;
+    for (i = 0; i < nr; i++) {
+        /* Pre-sync gap */
+        memset(q, 0x00, mfm_gap_sync);
+        q += mfm_gap_sync;
+        /* Sync + IDAM */
+        sync_off[i*2] = q-p; s = q;
+        memcpy(q, mfm_idam_mark, 4);
+        q += 4;
+        /* IDAM */
+        memcpy(q, &idam[i], 4);
+        q += 4;
+        /* CRC */
+        crc = crc16_ccitt(s, q-s, 0xffff);
+        *q++ = crc >> 8;
+        *q++ = crc;
+        /* GAP2 */
+        memset(q, 0x4e, mfm_gap2);
+        q += mfm_gap2;
+
+        /* Pre-sync gap */
+        memset(q, 0x00, mfm_gap_sync);
+        q += mfm_gap_sync;
+        /* Sync */
+        sync_off[i*2+1] = q-p; s = q;
+        memcpy(q, mfm_idam_mark, 3);
+        q += 3;
+        /* DAM */
+        *q++ = 0xfb;
+        /* Data */
+        memset(q, 0xe2, 128 << idam[i].n);
+        q += 128 << idam[i].n;
+        /* CRC */
+        crc = crc16_ccitt(s, q-s, 0xffff);
+        *q++ = crc >> 8;
+        *q++ = crc;
+        /* Post-data gap */
+        memset(q, 0x4e, gap3);
+        q += gap3;
+    }
+    /* Pre-index gap */
+    memset(q, 0x4e, 64);
+    q += 64;
+
+    /* Convert to MFM and fix the sync words. */
+    bin_to_mfm(p, track_bytes);
+    mfm_check(p+2, track_bytes-1);
+    for (i = 0; i < nr*2; i++) {
+        sync = (uint16_t *)&p[2*sync_off[i]];
+        *sync++ = htobe16(0x4489);
+        *sync++ = htobe16(0x4489);
+        *sync++ = htobe16(0x4489);
+    }
+
+    /* Do the write, index-to-index. */
+    floppy_write_prep(&wr);
+    index.count = 0;
+    while (index.count == 0)
+        continue;
+    floppy_write(&wr);
+}
+
 unsigned int ibm_fm_scan(
     struct ibm_scan_info *info, unsigned int max, unsigned int *p_gap3)
 {

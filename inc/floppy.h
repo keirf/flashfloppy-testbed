@@ -94,6 +94,8 @@ unsigned int ibm_mfm_scan(
 void ibm_mfm_read_sector(void *buf, const struct idam *idam);
 void ibm_mfm_write_sector(
     const void *buf, const struct idam *idam, unsigned int gap3);
+void ibm_mfm_write_track(
+    const struct idam *idam, unsigned int nr, unsigned int gap3);
 
 unsigned int ibm_fm_scan(
     struct ibm_scan_info *info, unsigned int max, unsigned int *p_gap3);

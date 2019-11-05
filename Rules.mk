@@ -19,6 +19,12 @@ FLAGS += -Wno-unused-value -fno-builtin
 FLAGS += -MMD -MF .$(@F).d
 DEPS = .*.d
 
+ifeq ($(quickdisk),y)
+FLAGS += -DQUICKDISK=1
+else
+shugart=y
+endif
+
 FLAGS += $(FLAGS-y)
 
 CFLAGS += $(CFLAGS-y) $(FLAGS) -include decls.h
