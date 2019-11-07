@@ -37,7 +37,7 @@ images:
 	cp scripts/FF.CFG images/
 	python3 ./scripts/mk_hfe.py --rate 500 images/hd.hfe
 	python3 ./scripts/mk_edsk.py images/tst_dsk.dsk
-	python3 ./scripts/mk_qd.py --window=1.0 --total=2.0 images/blank.qd 
+	python3 ./scripts/mk_qd.py --window=2.0 --total=3.2 images/blank.qd 
 
 write: images
 	sudo mount /dev/sdd1 /mnt

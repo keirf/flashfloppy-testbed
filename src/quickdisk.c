@@ -140,15 +140,40 @@ fail:
 
 static void check_mfm(void)
 {
-    struct idam idam[] = { { 2, 3, 4, 2 }, {2, 3, 5, 2} };
-    struct ibm_scan_info info[8];
-    unsigned int gap3, seen_nr;
+    const unsigned int n = 3, sz = 128 << n;
+    struct idam idam[22];
+    struct ibm_scan_info info[32];
+    unsigned int gap3, seen_nr, i;
+    uint8_t *p = alloca(sz), *q = alloca(sz);
 
+    for (i = 0; i < ARRAY_SIZE(idam); i++) {
+        idam[i].c = 2;
+        idam[i].h = 3;
+        idam[i].r = 4 + i;
+        idam[i].n = n;
+    }
+
+    printk("Format... ");
     set_motor(O_TRUE);
     ibm_mfm_write_track(idam, ARRAY_SIZE(idam), 84);
+
+    printk("Write Sector... ");
+    for (i = 0; i < sz; i++)
+        p[i] = rand()>>8;
+    ibm_mfm_write_sector(p, &idam[3], 84);
+
+    printk("Read Sector... ");
+    ibm_mfm_read_sector(q, &idam[3]);
+    WARN_ON(memcmp(p, q, sz));
+
+    printk("Scan Track... ");
     seen_nr = ibm_mfm_scan(info, ARRAY_SIZE(info), &gap3);
-    set_motor(O_FALSE);
     check_ibm_idams(idam, ARRAY_SIZE(idam), info, seen_nr);
+
+    printk("Motor Off and Pause... ");
+    set_motor(O_FALSE);
+    delay_ms(5000);
+    printk("Done.\n");
 }
 
 int main(void)
