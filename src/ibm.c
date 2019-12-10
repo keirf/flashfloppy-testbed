@@ -54,7 +54,7 @@ unsigned int ibm_mfm_scan(
     if (p_gap3 && (i >= 2) && (max >= 2)) {
         int sec_bytes = round_div(
             info[1].ticks_past_index - info[0].ticks_past_index,
-            16 * time_sysclk(cur_drive->ticks_per_cell));
+            time_sysclk(16 * cur_drive->ticks_per_cell));
         int gap3 = sec_bytes
             - (mfm_gap_sync + 8 + 2 + mfm_gap2)
             - (mfm_gap_sync + 4 + (128<<info[0].idam.n) + 2);
@@ -314,7 +314,7 @@ unsigned int ibm_fm_scan(
     if (p_gap3 && (i >= 2) && (max >= 2)) {
         int sec_bytes = round_div(
             info[1].ticks_past_index - info[0].ticks_past_index,
-            16 * time_sysclk(cur_drive->ticks_per_cell));
+            time_sysclk(16 * cur_drive->ticks_per_cell));
         int gap3 = sec_bytes
             - (fm_gap_sync + 5 + 2 + fm_gap2)
             - (fm_gap_sync + 1 + (128<<info[0].idam.n) + 2);
