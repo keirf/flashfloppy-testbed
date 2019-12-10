@@ -63,7 +63,7 @@ void floppy_init(void)
 
     /* RDATA DMA setup: From the RDATA Timer's CCRx into a circular buffer. */
     dma_rdata.cpar = (uint32_t)(unsigned long)&tim_rdata->ccr1;
-    dma_rdata.cmar = (uint32_t)(unsigned long)dma.buf;
+    dma_rdata.cmar = (uint32_t)(unsigned long)dma_r.buf;
 
     /* WDATA Timer setup:
      * The counter is incremented at full SYSCLK rate. 
@@ -82,7 +82,7 @@ void floppy_init(void)
 
     /* WDATA DMA setup: From a circular buffer into the WDATA Timer's ARR. */
     dma_wdata.cpar = (uint32_t)(unsigned long)&tim_wdata->arr;
-    dma_wdata.cmar = (uint32_t)(unsigned long)dma.buf;
+    dma_wdata.cmar = (uint32_t)(unsigned long)dma_w.buf;
 }
 
 

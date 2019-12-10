@@ -288,6 +288,12 @@ static void noinline img_test(void)
     printk("\nIMG TEST:\n");
     floppy_select(0);
 
+    da_select_image("2m88");
+    floppy_seek(0, 0);
+    idam.n = 2;
+    cur_drive->ticks_per_cell = sysclk_ns(500);
+    mfm_rw_sector(&idam, 1, 36);
+
     da_select_image("720k");
     floppy_seek(0, 0);
     idam.n = 2;

@@ -163,10 +163,11 @@ void ibm_mfm_write_sector(
     for (i = 0; i < 3; i++)
         *sync++ = htobe16(0x4489);
 
+    /* Prepare the write. */
+    floppy_write_prep(&wr);
+
     /* Find the sector. */
     ibm_mfm_search(&rd, idam);
-
-    floppy_write_prep(&wr);
 
     /* Wait for end of GAP2. */
     deadline = rd.end + time_sysclk(mfm_gap2 * 16 * cur_drive->ticks_per_cell);
@@ -414,10 +415,11 @@ void ibm_fm_write_sector(
     sync = (uint16_t *)&p[2*fm_gap_sync];
     *sync = htobe16(fm_sync(0xfb, FM_SYNC_CLK));
 
+    /* Prepare the write. */
+    floppy_write_prep(&wr);
+
     /* Find the sector. */
     ibm_fm_search(&rd, idam);
-
-    floppy_write_prep(&wr);
 
     /* Wait for end of GAP2. */
     deadline = rd.end + time_sysclk(fm_gap2 * 16 * cur_drive->ticks_per_cell);

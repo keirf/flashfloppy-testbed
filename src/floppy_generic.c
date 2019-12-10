@@ -20,7 +20,7 @@ static struct dma_ring {
     };
     /* DMA ring buffer of timer values (ARR or CCRx). */
     uint16_t buf[1024];
-} dma;
+} dma_r, dma_w;
 
 
 /*
@@ -29,59 +29,59 @@ static struct dma_ring {
 
 static bool_t rdata_wait_sync(struct read *rd)
 {
-    const uint16_t buf_mask = ARRAY_SIZE(dma.buf) - 1;
-    uint16_t cons, prod, prev = dma.prev_sample, curr, next;
+    const uint16_t buf_mask = ARRAY_SIZE(dma_r.buf) - 1;
+    uint16_t cons, prod, prev = dma_r.prev_sample, curr, next;
     uint16_t cell = cur_drive->ticks_per_cell;
-    uint16_t window = cell + (cell >> 1);
     uint32_t bc_dat = rd->bc_window, bc_prod = rd->bc_prod;
-    unsigned int sync = rd->sync, sync_found = 0;
+    unsigned int sync = rd->sync, sync_found = 0, nr;
     uint32_t *bc_buf = rd->p;
 
     /* Find out where the DMA engine's producer index has got to. */
-    prod = ARRAY_SIZE(dma.buf) - dma_rdata.cndtr;
+    prod = ARRAY_SIZE(dma_r.buf) - dma_rdata.cndtr;
 
     /* Process the flux timings into the raw bitcell buffer. */
-    for (cons = dma.cons; cons != prod; cons = (cons+1) & buf_mask) {
-        if (sync_found)
-            break;
-        next = dma.buf[cons];
+    cons = dma_r.cons;
+    while (cons != prod) {
+
+        next = dma_r.buf[cons];
+        cons = (cons+1) & buf_mask;
         curr = next - prev;
 #ifndef QUICKDISK /* This happens in ibm_mfm_{scan,search} for example. */
-        if (curr > (6*cell)) {
+        if (unlikely(curr > (6*cell))) {
             printk("Long flux @ dma=%u bc=%u: %u-%u=%u / %u\n",
                    cons, bc_prod, next, prev, curr, cell);
             WARN_ON(TRUE);
         }
 #endif
         prev = next;
-        while (curr > window) {
-            curr -= cell;
-            bc_dat <<= 1;
-            bc_prod++;
-        }
-        bc_dat = (bc_dat << 1) | 1;
-        bc_prod++;
-        switch (sync) {
-        case SYNC_fm:
+
+        nr = (curr - (cell>>1)) / cell + 1;
+        bc_dat = (bc_dat << nr) | 1;
+        bc_prod += nr;
+
+        if (unlikely(sync == SYNC_fm)) {
             /* FM clock sync clock byte is 0xc7. Check for:
              * 1010 1010 1010 1010 1x1x 0x0x 0x1x 1x1x */
-            if ((bc_dat & 0xffffd555) == 0x55555015)
+            if (unlikely((bc_dat & 0xffffd555) == 0x55555015)) {
                 sync_found = 31;
-            break;
-        case SYNC_mfm:
-            if (bc_dat == 0x44894489)
+                break;
+            }
+        } else { /* sync == SYNC_mfm */
+            if (unlikely(bc_dat == 0x44894489)) {
                 sync_found = 32;
-            break;
+                break;
+            }
         }
+
     }
 
     /* Save our progress for next time. */
     rd->bc_window = bc_dat;
     rd->bc_prod = bc_prod;
-    dma.cons = cons;
-    dma.prev_sample = prev;
+    dma_r.cons = cons;
+    dma_r.prev_sample = prev;
 
-    if (sync_found != 0) {
+    if (unlikely(sync_found != 0)) {
         time_t now = time_now();
         cell = ((now - rd->start) << 4) / bc_prod;
         rd->start = now - ((sync_found * cell) >> 4);
@@ -95,8 +95,8 @@ static bool_t rdata_wait_sync(struct read *rd)
 
 static bool_t rdata_flux_to_bc(struct read *rd)
 {
-    const uint16_t buf_mask = ARRAY_SIZE(dma.buf) - 1;
-    uint16_t cons, prod, prev = dma.prev_sample, curr, next;
+    const uint16_t buf_mask = ARRAY_SIZE(dma_r.buf) - 1;
+    uint16_t cons, prod, prev = dma_r.prev_sample, curr, next;
     uint16_t cell = cur_drive->ticks_per_cell;
     uint16_t window = cell + (cell >> 1);
     uint32_t bc_dat = rd->bc_window, bc_prod = rd->bc_prod;
@@ -104,11 +104,11 @@ static bool_t rdata_flux_to_bc(struct read *rd)
     uint32_t *bc_buf = rd->p;
 
     /* Find out where the DMA engine's producer index has got to. */
-    prod = ARRAY_SIZE(dma.buf) - dma_rdata.cndtr;
+    prod = ARRAY_SIZE(dma_r.buf) - dma_rdata.cndtr;
 
     /* Process the flux timings into the raw bitcell buffer. */
-    for (cons = dma.cons; cons != prod; cons = (cons+1) & buf_mask) {
-        next = dma.buf[cons];
+    for (cons = dma_r.cons; cons != prod; cons = (cons+1) & buf_mask) {
+        next = dma_r.buf[cons];
         curr = next - prev;
         if (curr > (6*cell)) {
             printk("Long flux @ dma=%u bc=%u: %u-%u=%u / %u\n",
@@ -136,8 +136,8 @@ static bool_t rdata_flux_to_bc(struct read *rd)
     /* Save our progress for next time. */
     rd->bc_window = bc_dat;
     rd->bc_prod = bc_prod;
-    dma.cons = cons;
-    dma.prev_sample = prev;
+    dma_r.cons = cons;
+    dma_r.prev_sample = prev;
     return FALSE;
 }
 
@@ -152,7 +152,7 @@ void floppy_read_prep(struct read *rd)
     rd->bc_prod = 0;
 
     /* Start DMA. */
-    dma_rdata.cndtr = ARRAY_SIZE(dma.buf);
+    dma_rdata.cndtr = ARRAY_SIZE(dma_r.buf);
     dma_rdata.ccr = (DMA_CCR_PL_HIGH |
                      DMA_CCR_MSIZE_16BIT |
                      DMA_CCR_PSIZE_16BIT |
@@ -162,8 +162,8 @@ void floppy_read_prep(struct read *rd)
                      DMA_CCR_EN);
 
     /* DMA soft state. */
-    dma.cons = 0;
-    dma.prev_sample = tim_rdata->cnt;
+    dma_r.cons = 0;
+    dma_r.prev_sample = tim_rdata->cnt;
 }
 
 void floppy_read(struct read *rd)
@@ -248,21 +248,21 @@ out:
 
 static void wdata_bc_to_flux(struct write *wr)
 {
-    const uint16_t buf_mask = ARRAY_SIZE(dma.buf) - 1;
+    const uint16_t buf_mask = ARRAY_SIZE(dma_w.buf) - 1;
     uint16_t nr_to_wrap, nr_to_cons, nr, dmacons;
 
     /* Find out where the DMA engine's consumer index has got to. */
-    dmacons = ARRAY_SIZE(dma.buf) - dma_wdata.cndtr;
+    dmacons = ARRAY_SIZE(dma_w.buf) - dma_wdata.cndtr;
 
     /* Find largest contiguous stretch of ring buffer we can fill. */
-    nr_to_wrap = ARRAY_SIZE(dma.buf) - dma.prod;
-    nr_to_cons = (dmacons - dma.prod - 1) & buf_mask;
+    nr_to_wrap = ARRAY_SIZE(dma_w.buf) - dma_w.prod;
+    nr_to_cons = (dmacons - dma_w.prod - 1) & buf_mask;
     nr = min(nr_to_wrap, nr_to_cons);
 
     /* Now attempt to fill the contiguous stretch with flux data calculated 
      * from buffered bitcell data. */
-    dma.prod += _wdata_bc_to_flux(wr, &dma.buf[dma.prod], nr);
-    dma.prod &= buf_mask;
+    dma_w.prod += _wdata_bc_to_flux(wr, &dma_w.buf[dma_w.prod], nr);
+    dma_w.prod &= buf_mask;
 }
 
 void floppy_write_prep(struct write *wr)
@@ -275,8 +275,8 @@ void floppy_write_prep(struct write *wr)
     wr->bc_cons = 0;
 
     /* Initialise DMA ring indexes (consumer index is implicit). */
-    dma_wdata.cndtr = ARRAY_SIZE(dma.buf);
-    dma.prod = 0;
+    dma_wdata.cndtr = ARRAY_SIZE(dma_w.buf);
+    dma_w.prod = 0;
 
     /* Generate initial flux values. */
     wdata_bc_to_flux(wr);
@@ -322,8 +322,8 @@ void floppy_write(struct write *wr)
             goto out;
         /* Check progress of draining the DMA ring. */
         prev_todo = todo;
-        dmacons = ARRAY_SIZE(dma.buf) - dma_wdata.cndtr;
-        todo = (dma.prod - dmacons) & (ARRAY_SIZE(dma.buf) - 1);
+        dmacons = ARRAY_SIZE(dma_w.buf) - dma_wdata.cndtr;
+        todo = (dma_w.prod - dmacons) & (ARRAY_SIZE(dma_w.buf) - 1);
     } while ((todo != 0) && (todo <= prev_todo));
 
 out:
