@@ -176,6 +176,17 @@ static void check_mfm(void)
     printk("Done.\n");
 }
 
+static void canary_init(void)
+{
+    _irq_stackbottom[0] = _thread_stackbottom[0] = 0xdeadbeef;
+}
+
+static void canary_check(void)
+{
+    ASSERT(_irq_stackbottom[0] == 0xdeadbeef);
+    ASSERT(_thread_stackbottom[0] == 0xdeadbeef);
+}
+
 int main(void)
 {
     unsigned int i;
@@ -185,6 +196,7 @@ int main(void)
         memcpy(_sdat, _ldat, _edat-_sdat);
     memset(_sbss, 0, _ebss-_sbss);
 
+    canary_init();
     stm32_init();
     time_init();
     console_init();
@@ -204,6 +216,7 @@ int main(void)
     for (i = 0; ; i++) {
         printk("\n*** ROUND %u ***\n", i);
         check_mfm();
+        canary_check();
     }
 
     return 0;
