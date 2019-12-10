@@ -11,36 +11,6 @@
 
 int EXC_reset(void) __attribute__((alias("main")));
 
-uint8_t board_id;
-
-static struct timer button_timer;
-static volatile uint8_t buttons;
-#define B_LEFT 1
-#define B_RIGHT 2
-static void button_timer_fn(void *unused)
-{
-    static uint16_t _b[2]; /* 0 = left, 1 = right */
-    uint8_t b = 0;
-    int i;
-
-    /* We debounce the switches by waiting for them to be pressed continuously 
-     * for 16 consecutive sample periods (16 * 5ms == 80ms) */
-    for (i = 0; i < 2; i++) {
-        _b[i] <<= 1;
-        _b[i] |= gpio_read_pin(gpioc, 8-i);
-    }
-
-    if (_b[0] == 0)
-        b |= B_LEFT;
-
-    if (_b[1] == 0)
-        b |= B_RIGHT;
-
-    /* Latch final button state and reset the timer. */
-    buttons = b;
-    timer_set(&button_timer, button_timer.deadline + time_ms(5));
-}
-
 static void canary_init(void)
 {
     _irq_stackbottom[0] = _thread_stackbottom[0] = 0xdeadbeef;
@@ -338,9 +308,6 @@ int main(void)
 
     led_7seg_init();
     led_7seg_write_string("FFT");
-
-    timer_init(&button_timer, button_timer_fn, NULL);
-    timer_set(&button_timer, time_now());
 
     for (i = 0; ; i++) {
         printk("\n*** ROUND %u ***\n", i);
