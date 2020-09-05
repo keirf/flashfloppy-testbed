@@ -30,6 +30,7 @@ images:
 	mkdir -p images
 	dd if=/dev/zero of=images/200k.ssd bs=1024 count=200
 	dd if=/dev/zero of=images/720k.img bs=1024 count=720
+	dd if=/dev/zero of=images/1m44.img bs=1024 count=1440
 	dd if=/dev/zero of=images/2m88.img bs=1024 count=2880
 	dd if=/dev/zero of=images/amiga_1760.adf bs=1024 count=1760
 	dd if=/dev/zero of=images/amiga_880.adf bs=1024 count=880
