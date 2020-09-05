@@ -80,6 +80,7 @@ void EXC_unexpected(struct extra_exception_frame *extra)
         show_stack(psp, (uint32_t)_thread_stacktop);
     }
 
+    for (;;);
     system_reset();
 }
 

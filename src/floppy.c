@@ -31,18 +31,18 @@ struct drive *cur_drive;
 
 static void step_one_out(void)
 {
+    delay_ms(4);
     set_dir(O_FALSE);
     set_step(O_TRUE);
     set_step(O_FALSE);
-    delay_ms(2);
 }
 
 static void step_one_in(void)
 {
+    delay_ms(4);
     set_dir(O_TRUE);
     set_step(O_TRUE);
     set_step(O_FALSE);
-    delay_ms(2);
 }
 
 void floppy_init(void)
@@ -153,7 +153,7 @@ void floppy_seek(unsigned int cyl, unsigned int side)
         step_one_out();
         drv->cyl--;
     }
-    delay_ms(10);
+//    delay_ms(10);
 }
 
 void floppy_disk_change(void)
@@ -228,11 +228,15 @@ volatile struct dskchg dskchg;
 
 static void IRQ_INDEX_changed(void)
 {
+    time_t diff, now = time_now();
+
     /* Clear INDEX-changed flag. */
     exti->pr = m(pin_index);
 
     index.count++;
-    index.timestamp = time_now();
+    diff = now - index.timestamp;
+    index.timestamp = now;
+    if(0)printk("[%u]", diff / TIME_MHZ);
 }
 
 static void IRQ_DSKCHG_changed(void)

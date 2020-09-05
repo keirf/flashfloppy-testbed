@@ -283,6 +283,88 @@ static void noinline img_test(void)
     mfm_rw_sector(&idam, 1, 1);
 }
 
+static void wait_rdata(void)
+{
+    int i;
+    for (i = 0; i < 3; i++) {
+        /* Wait for RDATA active. */
+        exti->pr = 1<<8;
+        while (!(exti->pr & (1<<8)))
+            continue;
+    }
+}
+
+static const uint8_t mfm_idam_mark[4] = { 0xa1, 0xa1, 0xa1, 0xfe };
+static void ibm_find_any(struct read *rd, struct idam *idam)
+{
+    uint8_t *p = bc_buf_alloc(10);
+
+    rd->p = p;
+    rd->nr_words = 10;
+    rd->sync = SYNC_mfm;
+
+    index.count = 0;
+
+    do {
+        WARN_ON(index.count >= 2);
+        floppy_read_prep(rd);
+        floppy_read(rd);
+        mfm_to_bin(p, 10);
+    } while (memcmp(p, mfm_idam_mark, 4));
+    memcpy(idam, p+4, 4);
+}
+
+static void noinline speed_test(void)
+{
+    struct read rd;
+    struct idam idam;
+    int cyls[] = { 23, 9, 8, 7, 8, 6, 3, 22, 45, 19, 29, 1, 18, 38 }, i, j, k;
+    int secs[36] = {1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36};
+//    int secs[] = { 3, 7, 11 };
+    const int sz = 512;
+    uint8_t *p = alloca(sz);
+    time_t t[2], t_w;
+
+    for (i = 0; i < sz; i++)
+        p[i] = rand()>>8;
+    for (i = 0; i < ARRAY_SIZE(cyls); i++)
+        cyls[i] = i;
+
+    floppy_select(0);
+    cur_drive->ticks_per_cell = sysclk_ns(1000);
+
+    for (i = 0; i < ARRAY_SIZE(cyls); i++) {
+        for (k = 0; k < 2; k++) {
+            floppy_seek(cyls[i], k);
+            t[0] = time_now();
+            wait_rdata();
+            t[1] = time_now();
+            ibm_find_any(&rd, &idam);
+            printk("\nS%u.%u: %u+%u=%u %u,%u,%u,%u\n", cyls[i], k,
+                   (t[1]-t[0])/TIME_MHZ, time_since(t[1])/TIME_MHZ,
+                   time_since(t[0])/TIME_MHZ,
+                   idam.c, idam.h, idam.r, idam.n);
+            if(1){
+                for (j = 0; j < ARRAY_SIZE(secs); j++) {
+                    idam.r = secs[j];
+                    t_w = time_now();
+                    ibm_mfm_write_sector(p, &idam, 40);
+                    if (1) {
+                        t[0] = time_now();
+                        wait_rdata();
+                        t[1] = time_now();
+                        ibm_find_any(&rd, &idam);
+                        printk("W%u(%u): %u,%u %u,%u,%u,%u\n", secs[j],
+                               (t[0]-t_w)/TIME_MHZ,
+                               (t[1]-t[0])/TIME_MHZ, time_since(t[1])/TIME_MHZ,
+                               idam.c, idam.h, idam.r, idam.n);
+                    }
+                }
+            }
+        }
+    }
+}
+
 int main(void)
 {
     unsigned int i;
@@ -311,12 +393,16 @@ int main(void)
 
     for (i = 0; ; i++) {
         printk("\n*** ROUND %u ***\n", i);
+        if (0) {
         da_test();
         hfe_test();
         dsk_test();
         adf_test(11);
         adf_test(22);
         img_test();
+        } else {
+            speed_test();
+        }
         canary_check();
     }
 

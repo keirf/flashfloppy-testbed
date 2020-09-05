@@ -138,13 +138,46 @@ fail:
     WARN_ON(TRUE);
 }
 
+static void wait_rdata(void)
+{
+    int i;
+    for (i = 0; i < 3; i++) {
+        /* Wait for RDATA active. */
+        exti->pr = 1<<8;
+        while (!(exti->pr & (1<<8)))
+            continue;
+    }
+}
+
+static const uint8_t mfm_idam_mark[4] = { 0xa1, 0xa1, 0xa1, 0xfe };
+static void ibm_find_any(struct read *rd, struct idam *idam)
+{
+    uint8_t *p = bc_buf_alloc(10);
+
+    rd->p = p;
+    rd->nr_words = 10;
+    rd->sync = SYNC_mfm;
+
+    index.count = 0;
+
+    do {
+        WARN_ON(index.count >= 2);
+        floppy_read_prep(rd);
+        floppy_read(rd);
+        mfm_to_bin(p, 10);
+    } while (memcmp(p, mfm_idam_mark, 4));
+    memcpy(idam, p+4, 4);
+}
+
 static void check_mfm(void)
 {
+    struct read rd;
     const unsigned int n = 3, sz = 128 << n;
-    struct idam idam[22];
+    struct idam idam[22], idam_w;
     struct ibm_scan_info info[32];
     unsigned int gap3, seen_nr, i;
     uint8_t *p = alloca(sz), *q = alloca(sz);
+    time_t t[2], t_w;
 
     for (i = 0; i < ARRAY_SIZE(idam); i++) {
         idam[i].c = 2;
@@ -160,7 +193,17 @@ static void check_mfm(void)
     printk("Write Sector... ");
     for (i = 0; i < sz; i++)
         p[i] = rand()>>8;
+    t_w = time_now();
     ibm_mfm_write_sector(p, &idam[3], 84);
+
+    t[0] = time_now();
+    wait_rdata();
+    t[1] = time_now();
+    ibm_find_any(&rd, &idam_w);
+    printk("W%u(%u): %u,%u %u,%u,%u,%u\n", idam[3].r,
+           (t[0]-t_w)/TIME_MHZ,
+           (t[1]-t[0])/TIME_MHZ, time_since(t[1])/TIME_MHZ,
+           idam_w.c, idam_w.h, idam_w.r, idam_w.n);
 
     printk("Read Sector... ");
     ibm_mfm_read_sector(q, &idam[3]);
