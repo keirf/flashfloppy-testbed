@@ -3,7 +3,7 @@ PROJ := FF_Test
 
 SUBDIRS += src
 
-.PHONY: all clean images flash start serial
+.PHONY: all clean images flash start serial ocd
 
 ifneq ($(RULES_MK),y)
 
@@ -41,13 +41,16 @@ images:
 	python3 ./scripts/mk_qd.py --window=2.0 --total=3.2 images/blank.qd 
 
 write: images
-	sudo mount /dev/sdd1 /mnt
+	sudo mount /dev/sdb1 /mnt
 	sudo rm -rf /mnt/*
 	sudo cp -r images/* /mnt/
 	sudo umount /mnt
 
 BAUD=115200
 DEV=/dev/ttyUSB1
+
+ocd: all
+	python3 scripts/openocd/flash.py `pwd`/FF.hex
 
 flash: all
 	sudo stm32flash -b $(BAUD) -w FF.hex $(DEV)
