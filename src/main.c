@@ -236,6 +236,8 @@ static void noinline dsk_test(void)
 {
     struct idam idam_8k = { 2, 0, 3, 6 };
     struct idam idam_512 = { 0, 0, 18, 2 };
+    char q[512];
+    int i;
 
     printk("\nDSK TEST:\n");
     floppy_select(0);
@@ -249,11 +251,24 @@ static void noinline dsk_test(void)
     mfm_rw_sector(&idam_512, 3, 16);
     idam_512.r = 3;
     mfm_rw_sector(&idam_512, 3, 16);
+
+    /* Format with a good IDAM.R */
+    ibm_mfm_write_track(&idam_512, 1, 84);
+    ibm_mfm_read_sector(q, &idam_512);
+    for (i = 0; i < ARRAY_SIZE(q); i++)
+        WARN_ON(q[i] != 0xe2);
+
+    /* Format with a bad IDAM.R */
+    idam_512.r = 22;
+    ibm_mfm_write_track(&idam_512, 1, 84);
 }
 
 static void noinline img_test(void)
 {
     struct idam idam = { 0, 0, 1, 2 };
+    struct idam idams[5];
+    char q[512];
+    int i;
 
     printk("\nIMG TEST:\n");
     floppy_select(0);
@@ -269,6 +284,17 @@ static void noinline img_test(void)
     idam.n = 2;
     cur_drive->ticks_per_cell = sysclk_us(2);
     mfm_rw_sector(&idam, 1, 9);
+
+    for (i = 0; i < ARRAY_SIZE(idams); i++) {
+        idams[i].c = 2;
+        idams[i].h = 3;
+        idams[i].r = i;
+        idams[i].n = idam.n;
+    }
+    ibm_mfm_write_track(idams, ARRAY_SIZE(idams), 84);
+    ibm_mfm_read_sector(q, &idam);
+    for (i = 0; i < ARRAY_SIZE(q); i++)
+        WARN_ON(q[i] != 0xe2);
 
     da_select_image("200k");
     floppy_seek(0, 0);
