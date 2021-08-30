@@ -33,6 +33,7 @@ static void step_one_out(void)
 {
     set_dir(O_FALSE);
     set_step(O_TRUE);
+    delay_ns(400);
     set_step(O_FALSE);
     delay_ms(2);
 }
@@ -41,6 +42,7 @@ static void step_one_in(void)
 {
     set_dir(O_TRUE);
     set_step(O_TRUE);
+    delay_ns(400);
     set_step(O_FALSE);
     delay_ms(2);
 }
