@@ -246,7 +246,7 @@ out:
     return nr - todo;
 }
 
-static void wdata_bc_to_flux(struct write *wr)
+static void wdata_bc_to_flux(struct write *wr, bool_t latency_sensitive)
 {
     const uint16_t buf_mask = ARRAY_SIZE(dma_w.buf) - 1;
     uint16_t nr_to_wrap, nr_to_cons, nr, dmacons;
@@ -258,6 +258,9 @@ static void wdata_bc_to_flux(struct write *wr)
     nr_to_wrap = ARRAY_SIZE(dma_w.buf) - dma_w.prod;
     nr_to_cons = (dmacons - dma_w.prod - 1) & buf_mask;
     nr = min(nr_to_wrap, nr_to_cons);
+    if (latency_sensitive)
+        nr = min_t(uint16_t, nr,
+                max_t(uint16_t, 32, ARRAY_SIZE(dma_w.buf)-nr_to_cons));
 
     /* Now attempt to fill the contiguous stretch with flux data calculated 
      * from buffered bitcell data. */
@@ -265,7 +268,7 @@ static void wdata_bc_to_flux(struct write *wr)
     dma_w.prod &= buf_mask;
 }
 
-void floppy_write_prep(struct write *wr)
+static void _floppy_write_prep(struct write *wr, bool_t latency_sensitive)
 {
     /* Check buffer alignment. */
     ASSERT(((uint32_t)wr->p & 3) == 0);
@@ -279,7 +282,7 @@ void floppy_write_prep(struct write *wr)
     dma_w.prod = 0;
 
     /* Generate initial flux values. */
-    wdata_bc_to_flux(wr);
+    wdata_bc_to_flux(wr, latency_sensitive);
 
     /* Enable DMA only after flux values are generated. */
     dma_wdata.ccr = (DMA_CCR_PL_HIGH |
@@ -291,11 +294,26 @@ void floppy_write_prep(struct write *wr)
                      DMA_CCR_EN);
 }
 
+void floppy_write_prep(struct write *wr)
+{
+    _floppy_write_prep(wr, FALSE);
+}
+
+void floppy_write_now(struct write *wr)
+{
+    _floppy_write_prep(wr, TRUE);
+    floppy_write(wr);
+}
+
 void floppy_write(struct write *wr)
 {
     uint32_t bc_max = wr->nr_words * 16;
     uint16_t dmacons, todo, prev_todo;
-    unsigned int index_count = index.count;
+    unsigned int stop_index;
+    if (wr->terminate_at_index)
+        stop_index = index.count + wr->terminate_at_index;
+    else
+        stop_index = index.count - 1;
 
     /* Start timer. */
     tim_wdata->egr = TIM_EGR_UG;
@@ -308,9 +326,9 @@ void floppy_write(struct write *wr)
 
     /* Emit flux into the DMA ring until all bitcells are consumed. */
     while (wr->bc_cons != bc_max) {
-        wdata_bc_to_flux(wr);
+        wdata_bc_to_flux(wr, TRUE);
         /* Early termination on index pulse? */
-        if (wr->terminate_at_index && (index.count != index_count))
+        if (index.count == stop_index)
             goto out;
     }
 
@@ -318,7 +336,7 @@ void floppy_write(struct write *wr)
     todo = ~0;
     do {
         /* Early termination on index pulse? */
-        if (wr->terminate_at_index && (index.count != index_count))
+        if (index.count == stop_index)
             goto out;
         /* Check progress of draining the DMA ring. */
         prev_todo = todo;

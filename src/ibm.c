@@ -133,7 +133,7 @@ void ibm_mfm_write_sector(
 
     wr.p = p = bc_buf_alloc(dam_bytes);
     wr.nr_words = dam_bytes;
-    wr.terminate_at_index = FALSE;
+    wr.terminate_at_index = 0;
 
     /* Generate the sector data. */
     q = p;
@@ -210,7 +210,7 @@ void ibm_mfm_write_track(
 
     wr.p = p = bc_buf_alloc(track_bytes);
     wr.nr_words = track_bytes;
-    wr.terminate_at_index = TRUE;
+    wr.terminate_at_index = 1;
 
     /* Generate the sector data. */
     q = p;
@@ -389,7 +389,7 @@ void ibm_fm_write_sector(
 
     wr.p = p = bc_buf_alloc(dam_bytes);
     wr.nr_words = dam_bytes;
-    wr.terminate_at_index = FALSE;
+    wr.terminate_at_index = 0;
 
     /* Generate the sector data. */
     q = p;

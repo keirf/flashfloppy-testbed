@@ -50,8 +50,8 @@ struct write {
     const void *p;
     /* Number of words (16-bitcells) to write. Must be multiple of two. */
     unsigned int nr_words;
-    /* Terminate write early at index hole? */
-    bool_t terminate_at_index;
+    /* Terminate write early at Xth index hole. 0 does not terminate early. */
+    int terminate_at_index;
 
     /** PRIVATE **/
     /* Accumulated ticks (SYSCLK*16) since previous flux reversal. */
@@ -62,6 +62,8 @@ struct write {
 
 void floppy_write_prep(struct write *wr);
 void floppy_write(struct write *wr);
+/* floppy_write_prep()+floppy_write() with minimal delay. */
+void floppy_write_now(struct write *wr);
 
 /*  
  * ASYNCHRONOUS (INTERRUPT-DRIVEN) FLOPPY SIGNALS

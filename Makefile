@@ -38,6 +38,7 @@ images:
 	cp scripts/IMG.CFG images/
 	cp scripts/FF.CFG images/
 	python3 ./scripts/mk_hfe.py --rate 500 images/hd.hfe
+	python3 ./scripts/mk_hfe.py --rate 250 --hard-sectors 10 images/dd_10sect.hfe
 	python3 ./scripts/mk_edsk.py images/tst_dsk.dsk
 	python3 ./scripts/mk_qd.py --window=2.0 --total=3.2 images/blank.qd 
 

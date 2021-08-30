@@ -185,7 +185,7 @@ void amiga_track_write(const void *buf, unsigned int track, unsigned int nsec)
     /* Do the write, index-to-index. */
     wr.p = p;
     wr.nr_words = track_bytes;
-    wr.terminate_at_index = TRUE;
+    wr.terminate_at_index = 1;
     floppy_write_prep(&wr);
     index.count = 0;
     while (index.count == 0)

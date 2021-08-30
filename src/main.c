@@ -9,6 +9,10 @@
  * See the file COPYING for more details, or visit <http://unlicense.org>.
  */
 
+#ifndef HARD_SECTORS
+#define HARD_SECTORS 0
+#endif
+
 int EXC_reset(void) __attribute__((alias("main")));
 
 static void canary_init(void)
@@ -44,7 +48,7 @@ static void noinline hfe_test(void)
 
     wr.p = p;
     wr.nr_words = tlen;
-    wr.terminate_at_index = FALSE;
+    wr.terminate_at_index = 0;
     floppy_write_prep(&wr);
     index.count = 0;
     while (index.count == 0)
@@ -56,7 +60,7 @@ static void noinline hfe_test(void)
         q[i] = htobe16(0x4489);
     for (i ; i < tlen; i++)
         q[i] = htobe16(0x4444);
-    wr.terminate_at_index = TRUE;
+    wr.terminate_at_index = 1;
     floppy_write_prep(&wr);
     index.count = 0;
     while (index.count == 0)
@@ -77,6 +81,107 @@ static void noinline hfe_test(void)
         if (be16toh(q[i]) != 0x4489)
             break;
     printk("We have %d 4489s\n", i);
+}
+
+static int32_t get_index_period(void)
+{
+    time_t s = index.timestamp;
+    while (index.timestamp == s)
+        continue;
+    return time_diff(s, index.timestamp);
+}
+
+static bool_t wait_for_hard_sector_trkstart(int sector_duration, int sectors)
+{
+    int i, j;
+    for (i = 0; i < 3; i++) {
+        j = get_index_period();
+        if (sector_duration - time_us(200) < j
+                && j < sector_duration + time_us(200)) break;
+    }
+    for (i = 0; i < sectors+1; i++) {
+        j = get_index_period();
+        if (sector_duration/2 - time_us(200) < j
+                && j < sector_duration/2 + time_us(200)) break;
+    }
+    j = get_index_period();
+    WARN_ON(sector_duration/2 - time_us(200) > j
+            || j > sector_duration/2 + time_us(200));
+    return i == sectors;
+}
+
+/* Assumes currently at track start. */
+static void check_hard_sector_indexes(int sector_duration, int sectors)
+{
+    int i, j;
+    for (i = 0; i < sectors-1; i++) {
+        j = get_index_period();
+        WARN_ON(sector_duration - time_us(200) > j
+                || j > sector_duration + time_us(200));
+    }
+    j = get_index_period();
+    WARN_ON(sector_duration/2 - time_us(200) > j
+            || j > sector_duration/2 + time_us(200));
+    j = get_index_period();
+    WARN_ON(sector_duration/2 - time_us(200) > j
+            || j > sector_duration/2 + time_us(200));
+}
+
+static void noinline hfe_hard_sector_test(void)
+{
+    unsigned int wlen = 2*512; /* Truncated write on index pulse. */
+    uint8_t *p = bc_buf_alloc(wlen);
+    uint16_t *q = (uint16_t *)p;
+    struct write wr;
+    int i, j;
+
+    floppy_select(0);
+    da_select_image("dd_10sect.hfe");
+    floppy_seek(0, 0);
+    cur_drive->ticks_per_cell = sysclk_us(2);
+
+    get_index_period(); /* Warmup */
+    i = get_index_period();
+    i = max_t(int, i, get_index_period());
+    i = max_t(int, i, get_index_period());
+    WARN_ON(time_us(19800) > i || i > time_us(20200));
+
+    WARN_ON(wait_for_hard_sector_trkstart(time_ms(20), 10));
+    check_hard_sector_indexes(time_ms(20), 10);
+
+    /* NorthStar Advantage formatting emulation */
+    memset(p, 0x4a, wlen*2);
+    i = 0;
+    for (j = 0; j < 33; j++)
+        q[i++] = htobe16(0xaaaa);
+    q[i++] = htobe16(0x5545); /* 0xfb */
+    i++;
+    for (j = 0; j < 512; j++)
+        q[i++] = htobe16(0x5555);
+    q[i++] = htobe16(0x4445); /* don't bother with crc */
+
+    WARN_ON(wait_for_hard_sector_trkstart(time_ms(20), 10));
+    for (int trk = 0; trk < 5; trk++) {
+        printk("Starting track %d\n", trk);
+        floppy_seek(trk, 0);
+        check_hard_sector_indexes(time_ms(20), 10);
+        /* Technically, have 150 us after sector pulse to start writing. But
+         * NorthStar Advantage delays ~18-25 us during formatting and PIP copy.
+         */
+        for (i = 0; i < 10; i++) {
+            time_t s = index.timestamp;
+            uint8_t id = 16*trk + i;
+            q[33+1] = htobe16(mfmtab[id] & ~(1 << 15));
+            wr.p = p;
+            wr.nr_words = wlen;
+            wr.terminate_at_index = i == 9 ? 2 : 1;
+            floppy_write_now(&wr);
+            j = time_diff(s, index.timestamp);
+            WARN_ON(time_us(19800) > j || j > time_us(20200));
+        }
+        check_hard_sector_indexes(time_ms(20), 10);
+        check_hard_sector_indexes(time_ms(20), 10);
+    }
 }
 
 static void noinline adf_test(unsigned int nsec)
@@ -337,6 +442,12 @@ int main(void)
 
     for (i = 0; ; i++) {
         printk("\n*** ROUND %u ***\n", i);
+        if (HARD_SECTORS) {
+            /* Requires different FF.CFG than other tests. */
+            hfe_hard_sector_test();
+            canary_check();
+            continue;
+        }
         da_test();
         hfe_test();
         dsk_test();
