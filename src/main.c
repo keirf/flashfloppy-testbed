@@ -127,7 +127,7 @@ static void check_hard_sector_indexes(int sector_duration, int sectors)
             || j > sector_duration/2 + time_us(200));
 }
 
-static void noinline hfe_hard_sector_test(void)
+static void noinline hfe_hard_sector_index_timing_test(void)
 {
     unsigned int wlen = 2*512; /* Truncated write on index pulse. */
     uint8_t *p = bc_buf_alloc(wlen);
@@ -158,7 +158,8 @@ static void noinline hfe_hard_sector_test(void)
     i++;
     for (j = 0; j < 512; j++)
         q[i++] = htobe16(0x5555);
-    q[i++] = htobe16(0x4445); /* don't bother with crc */
+    /* check byte: xor each payload byte then rotate left 1 bit. Init to 0 */
+    q[i++] = htobe16(0xaaaa);
 
     WARN_ON(wait_for_hard_sector_trkstart(time_ms(20), 10));
     for (int trk = 0; trk < 5; trk++) {
@@ -182,6 +183,80 @@ static void noinline hfe_hard_sector_test(void)
         check_hard_sector_indexes(time_ms(20), 10);
         check_hard_sector_indexes(time_ms(20), 10);
     }
+}
+
+static void noinline mfm_hard_sector_rw_sector(
+        int trk, int sector, int sz, int sector_duration, int nsect)
+{
+    uint8_t *p = alloca(sz);
+    uint16_t *bc = bc_buf_alloc(sz+10);
+    struct write wr;
+    struct read rd;
+    int i;
+
+    floppy_seek(trk, 0);
+    for (i = 0; i < sz/4; i++)
+        ((uint32_t*)p)[i] = rand();
+
+    for (i = 0; i < 6; i++)
+        bc[i] = htobe16(0xaaaa);
+    bc[6] = htobe16(0x4489);
+    bc[7] = htobe16(0x4489);
+    memcpy(bc + 8, p, sz);
+    bin_to_mfm(bc + 8, sz);
+    bc[8+sz] = htobe16(0xaaaa);
+    bc[8+sz+1] = htobe16(0xaaaa);
+    WARN_ON(wait_for_hard_sector_trkstart(sector_duration, nsect));
+    for (i = 0; i < sector; i++) get_index_period(); // TODO: add WARN
+    wr.p = bc;
+    wr.nr_words = sz+10;
+    wr.terminate_at_index = (sector == nsect-1) ? 2 : 1;
+    floppy_write_now(&wr);
+
+    rd.p = bc;
+    rd.nr_words = sz+2;
+    rd.sync = SYNC_mfm;
+    floppy_read_prep(&rd);
+    WARN_ON(wait_for_hard_sector_trkstart(sector_duration, nsect));
+    for (i = 0; i < sector; i++) get_index_period(); // TODO: add WARN
+    floppy_read(&rd);
+    mfm_to_bin(bc, sz+2);
+    WARN_ON(memcmp(p, (uint8_t*)bc + 2, sz));
+
+    floppy_seek(trk+1, 0);
+    floppy_seek(trk, 0);
+    rd.p = bc;
+    rd.nr_words = sz+2;
+    rd.sync = SYNC_mfm;
+    floppy_read_prep(&rd);
+    WARN_ON(wait_for_hard_sector_trkstart(sector_duration, nsect));
+    for (i = 0; i < sector; i++) get_index_period(); // TODO: add WARN
+    floppy_read(&rd);
+    mfm_to_bin(bc, sz+2);
+    WARN_ON(memcmp(p, (uint8_t*)bc + 2, sz));
+}
+
+static void noinline hfe_hard_sector_write_test(void)
+{
+    int i;
+
+    floppy_select(0);
+    da_select_image("dd_10sect.hfe");
+    floppy_seek(9, 0);
+    get_index_period(); /* Warmup */
+    WARN_ON(wait_for_hard_sector_trkstart(time_ms(20), 10));
+    check_hard_sector_indexes(time_ms(20), 10);
+
+    for (i = 0; i < 10; i++) {
+        printk("Sector %d\n", i);
+        mfm_hard_sector_rw_sector(9, i, 512, time_ms(20), 10);
+    }
+}
+
+static void noinline hfe_hard_sector_test(void)
+{
+    hfe_hard_sector_index_timing_test();
+    hfe_hard_sector_write_test();
 }
 
 static void noinline adf_test(unsigned int nsec)
