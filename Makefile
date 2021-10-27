@@ -50,15 +50,16 @@ write: images
 
 BAUD=115200
 DEV=/dev/ttyUSB1
+SUDO=sudo
 
 ocd: all
 	python3 scripts/openocd/flash.py `pwd`/FF.hex
 
 flash: all
-	sudo stm32flash -b $(BAUD) -w FF.hex $(DEV)
+	$(SUDO) stm32flash -b $(BAUD) -w FF.hex $(DEV)
 
 start:
-	sudo stm32flash -b $(BAUD) -g 0 $(DEV)
+	$(SUDO) stm32flash -b $(BAUD) -g 0 $(DEV)
 
 serial:
-	sudo miniterm.py $(DEV) 3000000
+	$(SUDO) miniterm.py $(DEV) 3000000
